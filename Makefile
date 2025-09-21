@@ -15,7 +15,7 @@ $2/$1.md : $2/$1.ipynb
 		--TagRemovePreprocessor.remove_input_tags="['remove_input','remove_output']" \
 		--NbConvertApp.output_files_dir=./assets/images/$1 \
 		--ExtractOutputPreprocessor.output_filename_template='fig_{index}{extension}'
-	sed -i '' -E 's/\/\.\.\/blog\//https:\/\/raw.githubusercontent.com\/ojitha\/blog\/master\//g' $$@
+	sed -i '' -E 's/\(\/\.\.\/blog\//\(https:\/\/raw.githubusercontent.com\/ojitha\/blog\/master\//g' $$@
 	sed -i '' -E 's/\x1B\[[0-9;]*[mK]//g' $$@
 	sed -i '' -E 's/\(\.\/assets/\(\/assets/g' $$@
 	cp $$@  ~/GitHub/ojitha.github.io/_drafts/
