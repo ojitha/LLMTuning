@@ -1,0 +1,149 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'SageMaker Studio Single User Quick Setup - Creates domain, execution role, and user profile'
+
+Parameters:
+  DomainName:
+    Type: String
+    Default: 'QuickSetupDomain'
+    Description: 'Base name for the SageMaker Studio domain (timestamp will be appended)'
+  
+  UserProfileName:
+    Type: String
+    Default: 'default-user'
+    Description: 'Base name for the default user profile'
+  
+  NetworkStackName:
+    Type: String
+    Description: 'Name of the network infrastructure stack to import VPC and subnet from'
+
+Resources:
+  # IAM Execution Role for SageMaker Studio
+  SageMakerExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub 'SageMaker-ExecRole-${AWS::StackName}'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - sagemaker.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSageMakerFullAccess
+        - arn:aws:iam::aws:policy/AmazonSageMakerCanvasFullAccess
+        - arn:aws:iam::aws:policy/AmazonSageMakerCanvasAIServicesAccess
+        - arn:aws:iam::aws:policy/AmazonS3FullAccess
+      Path: /
+
+  # SageMaker Canvas Time Series Forecasting Role
+  SageMakerCanvasForecastRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub 'SageMaker-ForecastRole-${AWS::StackName}'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - sagemaker.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonSageMakerCanvasForecastAccess
+      Path: /
+
+  # S3 Bucket for SageMaker artifacts
+  SageMakerS3Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub 'sagemaker-${AWS::AccountId}-${AWS::Region}-${AWS::StackName}'
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+
+  # SageMaker Studio Domain
+  SageMakerStudioDomain:
+    Type: AWS::SageMaker::Domain
+    Properties:
+      DomainName: !Sub '${DomainName}-${AWS::StackName}'
+      AuthMode: IAM
+      VpcId:
+        Fn::ImportValue: !Sub '${NetworkStackName}-VpcId'
+      SubnetIds:
+        - Fn::ImportValue: !Sub '${NetworkStackName}-PublicSubnetId'
+      AppNetworkAccessType: PublicInternetOnly
+      DefaultUserSettings:
+        ExecutionRole: !GetAtt SageMakerExecutionRole.Arn
+        SecurityGroups: []
+        SharingSettings:
+          NotebookOutputOption: Allowed
+          S3OutputPath: !Sub 's3://${SageMakerS3Bucket}/sharing'
+      DefaultSpaceSettings:
+        ExecutionRole: !GetAtt SageMakerExecutionRole.Arn
+      Tags:
+        - Key: Environment
+          Value: QuickSetup
+        - Key: CreatedBy
+          Value: CloudFormation
+
+  # Default User Profile
+  DefaultUserProfile:
+    Type: AWS::SageMaker::UserProfile
+    Properties:
+      DomainId: !Ref SageMakerStudioDomain
+      UserProfileName: !Sub '${UserProfileName}-${AWS::StackName}'
+      UserSettings:
+        ExecutionRole: !GetAtt SageMakerExecutionRole.Arn
+        SecurityGroups: []
+      Tags:
+        - Key: Environment
+          Value: QuickSetup
+        - Key: CreatedBy
+          Value: CloudFormation
+
+Outputs:
+  DomainId:
+    Description: 'SageMaker Studio Domain ID'
+    Value: !Ref SageMakerStudioDomain
+    Export:
+      Name: !Sub '${AWS::StackName}-DomainId'
+
+  DomainArn:
+    Description: 'SageMaker Studio Domain ARN'
+    Value: !GetAtt SageMakerStudioDomain.DomainArn
+    Export:
+      Name: !Sub '${AWS::StackName}-DomainArn'
+
+  UserProfileArn:
+    Description: 'Default User Profile ARN'
+    Value: !GetAtt DefaultUserProfile.UserProfileArn
+    Export:
+      Name: !Sub '${AWS::StackName}-UserProfileArn'
+
+  ExecutionRoleArn:
+    Description: 'SageMaker Execution Role ARN'
+    Value: !GetAtt SageMakerExecutionRole.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-ExecutionRoleArn'
+
+  StudioUrl:
+    Description: 'SageMaker Studio URL'
+    Value: !GetAtt SageMakerStudioDomain.Url
+    Export:
+      Name: !Sub '${AWS::StackName}-StudioUrl'
+
+  S3BucketName:
+    Description: 'S3 Bucket for SageMaker artifacts'
+    Value: !Ref SageMakerS3Bucket
+    Export:
+      Name: !Sub '${AWS::StackName}-S3Bucket'

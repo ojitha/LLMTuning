@@ -1,5 +1,5 @@
 NotebookDir := .
-NotebookSources := 2025_09_18_LLMTuningWithPyTorch
+NotebookSources := 2025_09_18_LLMTuningWithPyTorch 2025_07_23_LLMonAWS
 source += $(foreach jupfile,$(NotebookSources), $(NotebookDir)/$(jupfile))
 
 files := $(foreach wrd,$(source),$(wrd).md)
